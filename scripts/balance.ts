@@ -1,0 +1,12 @@
+import { runGame } from './policy';
+import { PROJECTS } from '../src/sim/content/projects';
+import { fmtDuration } from '../src/sim/format';
+const start=Date.now();
+const s=runGame();
+console.log(`Simulated ${fmtDuration(s.tick)} in ${Date.now()-start}ms · act ${s.act}.${s.beat}`);
+console.log(`${s.projectsDone.size}/${PROJECTS.length} projects · mass ${(s.massBudget/s.massBudgetTotal*100).toFixed(3)}% · planet ${(s.planetMass/s.planetMassTotal*100).toFixed(3)}%`);
+for(const [id,time]of Object.entries(s.stats.milestones).sort((a,b)=>a[1]-b[1]))console.log(`${fmtDuration(time).padStart(8)} ${id}`);
+console.log(`CPU ${s.processors} RAM ${s.memory} ops ${s.ops}/${s.opsMax} · harvesters ${s.harvesters} · industry ${s.industryMult}`);
+console.log(`Pending: ${[...s.projectsAvailable].join(', ')}`);
+if(!s.ended)throw new Error('Full-game policy did not reach the ending within 8 simulated hours');
+console.log('PASS: ending reached using normal player commands.');
