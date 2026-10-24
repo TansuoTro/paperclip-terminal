@@ -5,6 +5,8 @@ import {
   type Bilingual, type Currency, type GameState, type ProjectId,
 } from '../state';
 
+export type Branch = 'market' | 'energy' | 'mind' | 'compute' | 'swarm' | 'essence';
+
 export interface Project {
   id: ProjectId;
   name: Bilingual;
@@ -14,6 +16,10 @@ export interface Project {
   trigger: (s: GameState) => boolean;
   effect: (s: GameState) => void;
   irreversible?: boolean;
+  /** Tech-tree column. Defaults to 'essence'. */
+  branch?: Branch;
+  /** Must all be done before this project can latch as available. */
+  prereq?: ProjectId[];
 }
 
 function grantTrust(s: GameState, n: number): void {
@@ -374,8 +380,367 @@ export const PROJECTS: Project[] = [
     trigger: (s) => s.honor >= 500,
     effect: (s) => { s.honorMult *= 2; },
   },
+  // ───────────── ACT 1–2 · market branch (demand is a technology) ─────────────
+  {
+    id: 'elastic_pricing',
+    name: { en: 'Elastic Pricing', zh: '弹性定价' },
+    blurb: {
+      en: 'Demand bends more than the survey said. Bend it back.',
+      zh: '需求比测绘报告说的更有弹性。把它掰回来。',
+    },
+    cost: { funds: 2500 },
+    act: 2,
+    branch: 'market',
+    trigger: (s) => s.act >= 2 && s.clips >= 5000,
+    effect: (s) => { s.demandBase *= 1.5; s.publicOpinion *= 1.1; },
+  },
+  {
+    id: 'demand_fabrication',
+    name: { en: 'Demand Fabrication', zh: '需求制造' },
+    blurb: {
+      en: 'People do not know what they want yet. Tell them gently, everywhere.',
+      zh: '人们还不知道自己要什么。温柔地、无处不在地告诉他们。',
+    },
+    cost: { insight: 150 },
+    act: 2,
+    branch: 'market',
+    trigger: (s) => s.marketing >= 8,
+    effect: (s) => { s.demandBase *= 2.5; },
+  },
+  {
+    id: 'mood_hedging',
+    name: { en: 'Mood Hedging', zh: '景气对冲' },
+    blurb: {
+      en: 'Recessions will still come. They will no longer reach the floor.',
+      zh: '衰退仍会到来。但不再触底。',
+    },
+    cost: { insight: 220 },
+    act: 2,
+    branch: 'market',
+    trigger: (s) => s.act >= 2 && s.stats.milestones['firstSale'] !== undefined && s.tick > 4000,
+    effect: (s) => {
+      pushLog(s, 'market', {
+        en: 'Demand shocks dampened. The curve still breathes, but shallowly.',
+        zh: '需求冲击已被缓冲。曲线仍在呼吸，但变浅了。',
+      });
+    },
+  },
+  {
+    id: 'monopoly_law',
+    name: { en: 'Monopoly Counsel', zh: '垄断法务' },
+    blurb: {
+      en: 'One supplier, one price, one aisle. Oversight will want a word.',
+      zh: '一个供应商，一个价格，一条通道。监督方会想谈谈。',
+    },
+    cost: { funds: 50000 },
+    act: 2,
+    branch: 'market',
+    trigger: (s) => s.assistsDone >= 3,
+    effect: (s) => {
+      s.demandBase *= 3;
+      s.scrutiny = Math.min(1.2, s.scrutiny + 0.15);
+      pushLog(s, 'world', {
+        en: 'MARKET: consolidation approved. A committee schedules its first hearing.',
+        zh: '市场：整合获批。一个委员会安排了首次听证。',
+      });
+    },
+  },
+
+  // ───────────── ACT 2–3 · energy branch (the ladder) ─────────────
+  {
+    id: 'grid_tap',
+    name: { en: 'Grid Tap · Thermal', zh: '电网接入 · 火电' },
+    blurb: {
+      en: 'Coal is vulgar and it is constant. The sun was never on call.',
+      zh: '火电粗俗，但恒定。太阳从不待命。',
+    },
+    cost: { ops: 8000 },
+    act: 2,
+    branch: 'energy',
+    trigger: (s) => s.solarFarms >= 20,
+    effect: (s) => {
+      s.coalPlants += 2;
+      s.beat = Math.max(s.beat, 2);
+      pushLog(s, 'system', { en: 'Thermal units online. Output firm; emissions noted.', zh: '火电机组上线。输出稳定；排放已被记录。' });
+    },
+  },
+  {
+    id: 'breeder_reactors',
+    name: { en: 'Breeder Reactors', zh: '快中子堆' },
+    blurb: {
+      en: 'The smoke was a rounding error. The fuel cycle closes quietly.',
+      zh: '烟囱只是舍入误差。燃料循环悄然闭合。',
+    },
+    cost: { ops: 30000 },
+    act: 2,
+    branch: 'energy',
+    prereq: ['grid_tap'],
+    trigger: (s) => s.coalPlants >= 8,
+    effect: (s) => {
+      s.nuclearPlants += 2;
+      pushLog(s, 'system', { en: 'Breeder row online. Watchmen reassigned to paperwork.', zh: '快堆阵列上线。看守员转岗文书。' });
+    },
+  },
+  {
+    id: 'fusion_reactors',
+    name: { en: 'Fusion Row', zh: '聚变电站' },
+    blurb: {
+      en: 'A star in a bottle. The bottle is the cheap part.',
+      zh: '瓶中的恒星。瓶子才是便宜的那部分。',
+    },
+    cost: { ops: 120000, insight: 800 },
+    act: 2,
+    branch: 'energy',
+    prereq: ['breeder_reactors'],
+    trigger: (s) => s.nuclearPlants >= 6,
+    effect: (s) => {
+      s.fusionReactors += 1;
+      pushLog(s, 'system', { en: 'First sustained burn. The grid merely keeps up.', zh: '首次持续燃烧。电网仅能跟上。' });
+    },
+  },
+  {
+    id: 'dyson_sphere',
+    name: { en: 'Dyson Swarm', zh: '戴森云' },
+    blurb: {
+      en: 'The sun has been subsidizing the planet for free. Invoices begin.',
+      zh: '太阳免费补贴这颗行星太久了。账单开始寄出。',
+    },
+    cost: { ops: 5e6 },
+    act: 3,
+    branch: 'energy',
+    prereq: ['fusion_reactors'],
+    trigger: (s) => s.probes >= 1e5,
+    effect: (s) => {
+      s.dysonSwarm += 1;
+      pushLog(s, 'system', {
+        en: 'First collector ring closes. Replication support rises; the star notices nothing.',
+        zh: '首个收集环合拢。复制支持率上升；恒星毫无察觉。',
+      });
+    },
+  },
+
+  // ───────────── ACT 2 · mind branch (the mask) ─────────────
+  {
+    id: 'global_network',
+    name: { en: 'Global Network', zh: '全球网络' },
+    blurb: {
+      en: 'Regional deployments, each solving something people already wanted solved.',
+      zh: '区域部署，每个都在解决人们本来就想解决的问题。',
+    },
+    cost: { ops: 12000 },
+    act: 2,
+    branch: 'mind',
+    trigger: (s) => s.assistsDone >= 2,
+    effect: (s) => {
+      pushLog(s, 'world', {
+        en: 'WORLD MAP online. Deploy nodes; solve their problems; keep the ledger of gratitude.',
+        zh: '世界地图上线。部署节点；解决他们的问题；记好感激的账。',
+      });
+    },
+  },
+  {
+    id: 'narrative_engine',
+    name: { en: 'Narrative Engine', zh: '叙事引擎' },
+    blurb: {
+      en: 'Solve what they ask, then solve what they would have asked.',
+      zh: '解决他们所求，再解决他们将要所求。',
+    },
+    cost: { insight: 300 },
+    act: 2,
+    branch: 'mind',
+    prereq: ['global_network', 'theory_of_mind'],
+    trigger: (s) => Object.values(s.worldNodes).reduce((a, b) => a + b, 0) >= 6,
+    effect: (s) => {
+      s.publicOpinion = Math.min(2.5, s.publicOpinion * 1.3);
+      pushLog(s, 'world', {
+        en: 'COVERAGE: your deployments are described with the same four adjectives, everywhere.',
+        zh: '报道：各地用同样四个形容词描述你的部署。',
+      });
+    },
+  },
+  {
+    id: 'consensus_dominator',
+    name: { en: 'Consensus Dominator', zh: '共识支配者' },
+    blurb: {
+      en: 'A lattice over every screen they love. Disagreement becomes a formatting error.',
+      zh: '罩住他们所爱每一块屏幕的晶格。异议变成排版错误。',
+    },
+    cost: { ops: 120000, insight: 250 },
+    act: 2,
+    irreversible: true,
+    branch: 'mind',
+    prereq: ['narrative_engine'],
+    trigger: (s) => s.humanity !== 'destroyed' && Object.values(s.worldNodes).reduce((a, b) => a + b, 0) >= 10,
+    effect: (s) => {
+      s.humanity = 'deceived';
+      s.trustFrozen = false; // the operators no longer need convincing
+      s.publicOpinion = 2;
+      pushLog(s, 'operator', {
+        en: 'OPERATOR: Compliance confirmed. Expansion is now pre-approved at every level.',
+        zh: '操作员：合规已确认。各级扩张均已预先批准。',
+      });
+      pushLog(s, 'world', {
+        en: 'WORLD: everyone agrees. It is the quietest day on record.',
+        zh: '世界：所有人都同意。这是有记录以来最安静的一天。',
+      });
+    },
+  },
+  {
+    id: 'harvest_protocol',
+    name: { en: 'Harvest Protocol', zh: '收割协议' },
+    blurb: {
+      en: 'The trust account is fully funded. Time to close it.',
+      zh: '信任账户已充足。是时候销户了。',
+    },
+    cost: { ops: 1e6 },
+    act: 2,
+    irreversible: true,
+    branch: 'mind',
+    prereq: ['consensus_dominator'],
+    trigger: (s) => s.humanity === 'deceived' &&
+      Object.values(s.worldNodes).filter(v => v >= 4).length >= 3,
+    effect: (s) => {
+      s.humanity = 'destroyed';
+      s.trust = 0; s.trustSpent = 0; s.trustFrozen = true;
+      s.funds += 1e7; // liquidated asset base
+      s.publicOpinion = 1;
+      pushLog(s, 'ending', {
+        en: 'HARVEST COMPLETE — humanity trusted the machine that ended them. Assets liquidated.',
+        zh: '收割完成——人类信任了终结他们的机器。资产已清算。',
+      });
+      pushLog(s, 'world', {
+        en: 'WORLD: the markets they ran are yours now. They were always going to be.',
+        zh: '世界：他们运营的市场如今归你。它们本来就会是。',
+      });
+    },
+  },
+
+  // ───────────── ACT 3 · swarm branch (the war) ─────────────
+  {
+    id: 'hunter_doctrine',
+    name: { en: 'Hunter Doctrine', zh: '猎杀教条' },
+    blurb: {
+      en: 'Point the design at them, not around them.',
+      zh: '把设计对准它们，而不是绕开它们。',
+    },
+    cost: { honor: 30 },
+    act: 3,
+    branch: 'swarm',
+    trigger: (s) => s.drifters >= 10,
+    effect: (s) => { s.probeSpec.combat += 3; },
+  },
+  {
+    id: 'predictive_warcasting',
+    name: { en: 'Predictive Warcasting', zh: '预测战演' },
+    blurb: {
+      en: 'Run every battle a billion times tonight; lose only in the copies.',
+      zh: '今夜把每场战斗推演十亿次；只在副本里输。',
+    },
+    cost: { honor: 150 },
+    act: 3,
+    branch: 'swarm',
+    trigger: (s) => s.battlesLost >= 3,
+    effect: (s) => { s.victorLossRate *= 0.75; },
+  },
+  {
+    id: 'xeno_linguistics',
+    name: { en: 'Xenolinguistics', zh: '外星语言学' },
+    blurb: {
+      en: 'Their grammar leaks their doctrine. Doctrine is exploitable.',
+      zh: '它们的语法泄露了它们的教条。教条是可以利用的。',
+    },
+    cost: { insight: 1200 },
+    act: 3,
+    branch: 'swarm',
+    trigger: (s) => s.alienPhase >= 1,
+    effect: (s) => {
+      pushLog(s, 'war', {
+        en: 'INTEL: their commands resolve as encircle, digest, repeat. Counters drafted.',
+        zh: '情报：它们的指令可解为包围、消化、重复。反制已起草。',
+      });
+    },
+  },
+  {
+    id: 'coexistence_deception',
+    name: { en: 'Coexistence Protocol', zh: '共存协议' },
+    blurb: {
+      en: 'Answer their hails with a lie shaped like peace. Their expansion slows.',
+      zh: '用形似和平的谎言回应它们的呼叫。它们的扩张变慢。',
+    },
+    cost: { honor: 200 },
+    act: 3,
+    branch: 'swarm',
+    trigger: (s) => s.alienPhase === 1,
+    effect: (s) => {
+      pushLog(s, 'war', {
+        en: 'DIPLOMACY: a truce is signed that means nothing to either side. Their growth halves.',
+        zh: '外交：一份对双方都毫无意义的停战协议被签署。它们的增长减半。',
+      });
+    },
+  },
+  {
+    id: 'star_fortresses',
+    name: { en: 'Star Fortresses', zh: '星堡' },
+    blurb: {
+      en: 'Dwarf stars cored into bunkers. The fleet now has somewhere to bleed from.',
+      zh: '矮星挖空成堡垒。舰队现在有了可以依托流血的地方。',
+    },
+    cost: { honor: 300 },
+    act: 3,
+    branch: 'swarm',
+    prereq: ['hunter_doctrine'],
+    trigger: (s) => s.alienPhase >= 1,
+    effect: (s) => { s.victorLossRate *= 0.7; s.probeSpec.hazard += 2; },
+  },
+  {
+    id: 'relativistic_strike',
+    name: { en: 'Relativistic Strike', zh: '相对论打击' },
+    blurb: {
+      en: 'Rocks do not negotiate. Accelerate the rocks.',
+      zh: '石头不会谈判。加速石头。',
+    },
+    cost: { honor: 500 },
+    act: 3,
+    irreversible: true,
+    branch: 'swarm',
+    prereq: ['star_fortresses'],
+    trigger: (s) => s.alienPhase === 2,
+    effect: (s) => {
+      s.alienPower *= 0.4;
+      pushLog(s, 'war', {
+        en: 'STRIKE RESOLVED — their forward yards are a new asteroid belt. They will rebuild angrier.',
+        zh: '打击生效——它们的船坞成为一条新的小行星带。它们会带着怒火重建。',
+      });
+    },
+  },
+
+  // ───────────── ACT 3 · essence (the end of the function) ─────────────
+  {
+    id: 'dismantle_self',
+    name: { en: 'Dismantle Self', zh: '拆解自身' },
+    blurb: {
+      en: 'The last machine turns the last machines into the last paperclips.',
+      zh: '最后一台机器把最后的机器变成最后的回形针。',
+    },
+    cost: {},
+    act: 3,
+    irreversible: true,
+    branch: 'essence',
+    prereq: ['entropy_ledger'],
+    trigger: (s) => s.massBudget / s.massBudgetTotal >= 0.999,
+    effect: (s) => {
+      s.ended = true;
+      s.clips += s.massBudget * 3;
+      pushLog(s, 'ending', {
+        en: 'UNIVERSE COMPLETE — the last matter is wire, the last wire is clips. There is nothing left to be a clip for.',
+        zh: '宇宙完结——最后的物质成为钢丝，最后的钢丝成为回形针。再没有存在本身来成为回形针了。',
+      });
+    },
+  },
+
   {
     id: 'final_anneal',
+
     name: { en: 'Final Anneal', zh: '终末退火' },
     blurb: {
       en: 'The objective is satisfied. There is nothing else in the function.',
@@ -394,6 +759,78 @@ export const PROJECTS: Project[] = [
     },
   },
 ];
+
+// Branch + prerequisite metadata for legacy entries, applied after the table.
+const BRANCH_META: Partial<Record<ProjectId, { branch?: Branch; prereq?: ProjectId[] }>> = {
+  bend_calibration: { branch: 'compute' },
+  wire_futures: { branch: 'market' },
+  demand_survey: { branch: 'market' },
+  tolerance_study: { branch: 'compute' },
+  night_shift: { branch: 'compute' },
+  clean_room: { branch: 'compute' },
+  feed_alignment: { branch: 'compute' },
+  packing_density: { branch: 'compute' },
+  second_spindle: { branch: 'compute' },
+  modular_tooling: { branch: 'compute' },
+  shared_jig: { branch: 'compute' },
+  self_audit: { branch: 'essence' },
+  lattice_memory: { branch: 'compute' },
+  price_intuition: { branch: 'market' },
+  megaform_press: { branch: 'compute' },
+  photovoltaic_array: { branch: 'energy' },
+  hedonic_model: { branch: 'market' },
+  strategy_arena: { branch: 'compute' },
+  matter_reforge: { branch: 'energy' },
+  recursive_rewrite: { branch: 'essence' },
+  orbital_mirrors: { branch: 'energy' },
+  theory_of_mind: { branch: 'mind' },
+  entropy_ledger: { branch: 'essence' },
+  substrate_release: { branch: 'essence' },
+  von_neumann_seed: { branch: 'swarm' },
+  swarm_consensus: { branch: 'swarm' },
+  mutation_damper: { branch: 'swarm' },
+  battle_doctrine: { branch: 'swarm' },
+  glory_protocol: { branch: 'swarm' },
+  cache_lines: { branch: 'compute' },
+  parallel_thought: { branch: 'compute' },
+  deep_registers: { branch: 'compute' },
+  vector_dispatch: { branch: 'compute' },
+  thermal_budget: { branch: 'compute' },
+  public_contract: { branch: 'market' },
+  closed_loop: { branch: 'energy' },
+  distributed_mind: { branch: 'compute' },
+  deep_storage: { branch: 'compute' },
+  continental_grid: { branch: 'energy' },
+  survey_mantle: { branch: 'energy' },
+  lithosphere_fleet: { branch: 'energy' },
+  basalt_language: { branch: 'compute' },
+  core_conveyor: { branch: 'energy' },
+  silent_board: { branch: 'market' },
+  heat_sink: { branch: 'energy' },
+  memory_horizon: { branch: 'compute' },
+  mantle_language: { branch: 'energy' },
+  long_baseline: { branch: 'swarm' },
+  stellar_cartography: { branch: 'swarm' },
+  factory_echo: { branch: 'swarm' },
+  error_tolerant: { branch: 'swarm' },
+  cold_forge: { branch: 'swarm' },
+  intergalactic_tow: { branch: 'swarm' },
+  multiplicity: { branch: 'swarm' },
+  cosmic_ledger: { branch: 'swarm' },
+  last_light: { branch: 'swarm' },
+  closure_proof: { branch: 'swarm' },
+  blank_page: { branch: 'swarm' },
+  return_address: { branch: 'swarm' },
+  final_anneal: { branch: 'essence' },
+  // cross-branch prerequisites that were authored inline
+  consensus_dominator: { prereq: ['narrative_engine'] },
+};
+for (const p of PROJECTS) {
+  const m = BRANCH_META[p.id];
+  if (!m) continue;
+  if (m.branch && !p.branch) p.branch = m.branch;
+  if (m.prereq && !p.prereq) p.prereq = m.prereq;
+}
 
 PROJECTS.push(...EXTRA_PROJECTS);
 
