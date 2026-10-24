@@ -263,7 +263,7 @@ export function createInitialState(seed = 0x9e3779b9): GameState {
     moodTarget: 1,
     moodNextShift: 0,
 
-    newsNextTick: 0,
+    newsNextTick: 300,
     newsCursor: 0,
 
     probes: 0,

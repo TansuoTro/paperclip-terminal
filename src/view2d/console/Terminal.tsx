@@ -63,21 +63,23 @@ export function Terminal() {
           </span>
         </div>
 
-        <NewsTicker s={s} />
+        <div class="stage-wrap">
+          <NewsTicker s={s} />
 
-        {menu ? <div class="sys-overlay" role="dialog" aria-modal="true" aria-label={t({en:"System",zh:"系统"})}><button class="close-menu" onClick={()=>setMenu(false)}>× {t({en:"CLOSE",zh:"关闭"})}</button><SysMenu /></div> : null}
-        {tech ? <TechTree s={s} onClose={() => setTech(false)} /> : null}
-        {world ? <WorldMap s={s} onClose={() => setWorld(false)} /> : null}
+          {menu ? <div class="sys-overlay" role="dialog" aria-modal="true" aria-label={t({en:"System",zh:"系统"})}><button class="close-menu" onClick={()=>setMenu(false)}>× {t({en:"CLOSE",zh:"关闭"})}</button><SysMenu /></div> : null}
+          {tech ? <TechTree s={s} onClose={() => setTech(false)} /> : null}
+          {world ? <WorldMap s={s} onClose={() => setWorld(false)} /> : null}
 
-        <div class="stage" data-level={level}>
-          {s.clips < 5 ? <div class="first-hint">{t({en:'One objective. One machine. Begin with a single paperclip.',zh:'一个目标。一台机器。从第一枚回形针开始。'})}</div> : null}
-          <Panel slot="ledger" s={s} />
-          {s.act < 3 ? <Panel slot="controls" s={s} /> : null}
-          <Viewport s={s} />
-          {s.act < 3 ? <Panel slot="market" s={s} also={['public']} area="market" /> : null}
-          <Panel slot="compute" s={s} also={['energy', 'matter']} area="systems" />
-          <Panel slot="swarm" s={s} also={['war']} area="swarm" />
-          <Projects s={s} />
+          <div class="stage" data-level={level}>
+            {s.clips < 5 ? <div class="first-hint">{t({en:'One objective. One machine. Begin with a single paperclip.',zh:'一个目标。一台机器。从第一枚回形针开始。'})}</div> : null}
+            <Panel slot="ledger" s={s} />
+            {s.act < 3 ? <Panel slot="controls" s={s} /> : null}
+            <Viewport s={s} />
+            {s.act < 3 ? <Panel slot="market" s={s} also={['public']} area="market" /> : null}
+            <Panel slot="compute" s={s} also={['energy', 'matter']} area="systems" />
+            <Panel slot="swarm" s={s} also={['war']} area="swarm" />
+            <Projects s={s} />
+          </div>
         </div>
 
         <div class="mobile-tools" role="group" aria-label={t({en:'Terminal tools',zh:'终端工具'})}>

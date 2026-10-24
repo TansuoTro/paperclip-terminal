@@ -4,7 +4,7 @@ import type { GameState } from '../../sim/state';
 import { useText, WidgetView } from './WidgetView';
 import { ComputeAllocation, ProbeDesigner, Tournament } from './Modules';
 
-const SIZE_KEY = 'paperclip-terminal.panelsize.v1';
+const SIZE_KEY = 'paperclip-terminal.panelsize.v2';
 
 function loadSizes(): Record<string, { w: number; h: number }> {
   try { return JSON.parse(localStorage.getItem(SIZE_KEY) ?? '{}'); } catch { return {}; }
@@ -34,7 +34,7 @@ function useResize(area: string) {
     const move = (e: PointerEvent) => {
       if (!el.classList.contains('resizing')) return;
       const w = Math.max(180, Math.min(900, startW + e.clientX - startX));
-      const h = Math.max(120, Math.min(1200, startH + e.clientY - startY));
+      const h = Math.max(180, Math.min(1200, startH + e.clientY - startY));
       el.style.width = `${w}px`; el.style.height = `${h}px`;
     };
     const up = (e: PointerEvent) => {
