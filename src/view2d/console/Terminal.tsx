@@ -10,8 +10,11 @@ import { CmdLine } from './CmdLine';
 import { Log } from './Log';
 import { Panel } from './Panel';
 import { Projects } from './Projects';
+import { TechTree } from './TechTree';
+import { WorldMap } from './WorldMap';
 import { Viewport } from './Viewport';
 import { useText } from './WidgetView';
+import { latestNews } from '../../sim/systems/news';
 
 const ACT_NAMES = [
   { en: 'I · BENCH', zh: '一 · 台面' },
@@ -27,6 +30,8 @@ export function Terminal() {
   const t = useText();
   const level = layoutLevel(s);
   const [menu, setMenu] = useState(false);
+  const [tech, setTech] = useState(false);
+  const [world, setWorld] = useState(false);
   const [mobileLog, setMobileLog] = useState(false);
   const [mobileCommand, setMobileCommand] = useState(false);
 
@@ -44,22 +49,34 @@ export function Terminal() {
           <span class="acts">
             <span>{t(ACT_NAMES[s.act - 1]!)}</span>
             <span>{fmtDuration(s.tick)}</span>
+            {s.projectsDone.has('global_network') && s.act < 3 ? (
+              <button onClick={() => setWorld((w) => !w)} aria-expanded={world} data-testid="world-btn">
+                {t({ en: 'WORLD', zh: '世界' })}
+              </button>
+            ) : null}
+            <button onClick={() => setTech((v) => !v)} aria-expanded={tech} data-testid="tech-btn">
+              {t({ en: 'TECH', zh: '科技' })}
+            </button>
             <button onClick={() => setMenu((m) => !m)} aria-expanded={menu}>
               {t({ en: 'SYS', zh: '系统' })}
             </button>
           </span>
         </div>
 
+        <NewsTicker s={s} />
+
         {menu ? <div class="sys-overlay" role="dialog" aria-modal="true" aria-label={t({en:"System",zh:"系统"})}><button class="close-menu" onClick={()=>setMenu(false)}>× {t({en:"CLOSE",zh:"关闭"})}</button><SysMenu /></div> : null}
+        {tech ? <TechTree s={s} onClose={() => setTech(false)} /> : null}
+        {world ? <WorldMap s={s} onClose={() => setWorld(false)} /> : null}
 
         <div class="stage" data-level={level}>
           {s.clips < 5 ? <div class="first-hint">{t({en:'One objective. One machine. Begin with a single paperclip.',zh:'一个目标。一台机器。从第一枚回形针开始。'})}</div> : null}
           <Panel slot="ledger" s={s} />
           {s.act < 3 ? <Panel slot="controls" s={s} /> : null}
           <Viewport s={s} />
-          {s.act < 3 ? <Panel slot="market" s={s} area="market" /> : null}
+          {s.act < 3 ? <Panel slot="market" s={s} also={['public']} area="market" /> : null}
           <Panel slot="compute" s={s} also={['energy', 'matter']} area="systems" />
-          <Panel slot="swarm" s={s} area="swarm" />
+          <Panel slot="swarm" s={s} also={['war']} area="swarm" />
           <Projects s={s} />
         </div>
 
@@ -71,6 +88,19 @@ export function Terminal() {
         <Log s={s} />
       </div>
       {s.ended ? <Ending /> : null}
+    </div>
+  );
+}
+
+/** One-line world news under the titlebar; click opens the full log. */
+function NewsTicker({ s }: { s: import('../../sim/state').GameState }) {
+  const news = latestNews(s);
+  if (!news) return null;
+  const zh = s.settings.locale === 'zh-CN';
+  return (
+    <div class="news-ticker" role="status">
+      <span class="news-tag">{zh ? '世界' : 'WIRE'}</span>
+      <span class="news-text">{zh ? news.zh : news.en}</span>
     </div>
   );
 }
