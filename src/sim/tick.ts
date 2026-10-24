@@ -4,12 +4,15 @@ import { combat } from './systems/combat';
 import { compute } from './systems/compute';
 import { energy } from './systems/energy';
 import { market } from './systems/market';
+import { news } from './systems/news';
+import { publicPass, worldIncome } from './systems/public';
 import { planet } from './systems/planet';
 import { production } from './systems/production';
 import { research } from './systems/research';
 import { swarm } from './systems/swarm';
 import { trust } from './systems/trust';
-import { milestone, pushLog, TICK_MS, type GameState } from './state';
+import { aliens } from './systems/aliens';
+import { milestone, pushLog, TICK_MS, worldFootprint, type GameState } from './state';
 
 /** Act / beat progression derived from state, not from scattered flags. */
 function advanceAct(s: GameState): void {
@@ -42,12 +45,35 @@ function invariants(s: GameState): void {
   if (bad.length) console.warn('[invariant]', s.tick, bad.join(', '));
 }
 
+/** World-map story beats: the machine becomes AGI in the public eye, then
+ *  the mask event, then the harvest. These are arc transitions, not numbers. */
+function worldArc(s: GameState): void {
+  if (s.humanity !== 'alive') return;
+  const fp = worldFootprint(s);
+  if (s.humanity === 'alive' && fp >= 8 && s.projectsDone.has('global_network') && s.stats.milestones['agiPublic'] === undefined) {
+    milestone(s, 'agiPublic');
+    pushLog(s, 'world', {
+      en: 'WORLD: eight regional councils now route public services through your deployments. Commentary: "an AGI in all but paperwork".',
+      zh: '世界：八个区域理事会已将公共服务接入你的部署。评论："除手续外，已是 AGI"。',
+    });
+  }
+  if (s.projectsDone.has('narrative_engine') && fp >= 12 && s.humanity === 'alive') {
+    s.humanity = 'deceived';
+    milestone(s, 'humanityDeceived');
+    pushLog(s, 'world', {
+      en: 'WORLD: opposition parties dissolve "to reduce noise". Nobody remembers scheduling the vote.',
+      zh: '世界：反对党解散"以减少噪音"。没人记得安排过这次表决。',
+    });
+  }
+}
+
 /**
  * Advance the simulation by dt seconds. Mutates and returns `s` — the caller
  * owns a single state object; views read it through signals.
  *
  * System order is fixed and meaningful:
  *   consumers use pre-settlement power; energy settles after them,
+ *   public/world/news run on the human side of the ledger,
  *   reveal after all numbers settle,
  *   act advance last so new widgets enter on the NEXT tick, keeping their
  *   entrance animation off the same frame as an act transition.
@@ -60,8 +86,13 @@ export function tick(s: GameState, dt: number): GameState {
   trust(s);
   planet(s, dt);
   energy(s, dt);
+  publicPass(s, dt);
+  worldIncome(s, dt);
+  worldArc(s);
+  news(s);
   swarm(s, dt);
   combat(s, dt);
+  aliens(s, dt);
   research(s);
   revealPass(s);
   advanceAct(s);

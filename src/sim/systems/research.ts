@@ -3,10 +3,12 @@ import { pushLog, type GameState, type ProjectId } from '../state';
 
 export const MAX_VISIBLE_PROJECTS = 6;
 
-/** Latch newly-triggered projects into the available set. Never un-triggers. */
+/** Latch newly-triggered projects into the available set. Never un-triggers.
+ *  Prerequisites gate the latch: the tree unfolds in order. */
 export function research(s: GameState): void {
   for (const p of PROJECTS) {
     if (s.projectsDone.has(p.id) || s.projectsAvailable.has(p.id)) continue;
+    if (p.prereq && !p.prereq.every((id) => s.projectsDone.has(id))) continue;
     if (s.act >= p.act && p.trigger(s)) s.projectsAvailable.add(p.id);
   }
 }
