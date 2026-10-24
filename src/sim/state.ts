@@ -5,6 +5,8 @@ import { BAL } from './balance';
 export type WidgetId = string;
 export type ProjectId = string;
 export type Currency = 'funds' | 'ops' | 'insight' | 'trust' | 'honor';
+export type HumanityPhase = 'alive' | 'deceived' | 'destroyed';
+export type BattleStance = 'meet' | 'ambush' | 'fortify';
 
 export interface Bilingual {
   en: string;
@@ -13,7 +15,7 @@ export interface Bilingual {
 
 export interface LogEntry {
   tick: number;
-  kind: 'system' | 'module' | 'project' | 'market' | 'operator' | 'combat' | 'offline' | 'ending';
+  kind: 'system' | 'module' | 'project' | 'market' | 'operator' | 'combat' | 'offline' | 'ending' | 'news' | 'war' | 'world';
   text: Bilingual;
 }
 
@@ -44,6 +46,12 @@ export interface Settings {
   musicVolume: number;
   sfxVolume: number;
   autoPrice: boolean;
+}
+
+/** One deployed AI node on the world map. */
+export interface WorldRegion {
+  id: string;
+  level: number;
 }
 
 export interface GameState {
@@ -95,6 +103,32 @@ export interface GameState {
   dayNightFloor: number;
   publicOpinion: number;
 
+  // --- energy ladder ---
+  coalPlants: number;
+  nuclearPlants: number;
+  fusionReactors: number;
+  dysonSwarm: number;
+
+  // --- world map / humanity ---
+  humanity: HumanityPhase;
+  /** 0..1 — how closely the operators are watching. Raised by extraction, lowed by assistance. */
+  scrutiny: number;
+  assistCooldown: number;
+  assistsDone: number;
+  /** fractional trust from assistance programs, carried until it reaches 1 */
+  trustCarry: number;
+  /** region id -> deployed level (0 = nothing deployed) */
+  worldNodes: Record<string, number>;
+
+  // --- market mood ---
+  marketMood: number;
+  moodTarget: number;
+  moodNextShift: number;
+
+  // --- world news ---
+  newsNextTick: number;
+  newsCursor: number;
+
   // --- Act 3 ---
   probes: number;
   probeSpec: ProbeSpec;
@@ -112,6 +146,13 @@ export interface GameState {
   victorLossRate: number;
   nextBattleTick: number;
   nextMutationTick: number;
+  battleStance: BattleStance;
+
+  // --- aliens ---
+  alienPhase: 0 | 1 | 2 | 3;
+  alienPower: number;
+  alienFleetsDestroyed: number;
+  warNextTick: number;
 
   // --- Meta ---
   revealed: Set<WidgetId>;
@@ -130,7 +171,7 @@ export const TICK_MS = 100;
 export const WIRE_PER_SPOOL = 1000;
 export const PLANET_MASS_TOTAL = 6.0e24;
 export const MASS_BUDGET_TOTAL = 3.35e54;
-export const LOG_CAP = 200;
+export const LOG_CAP = 240;
 
 export function emptyProbeSpec(): ProbeSpec {
   return {
@@ -206,6 +247,25 @@ export function createInitialState(seed = 0x9e3779b9): GameState {
     dayNightFloor: 0.3,
     publicOpinion: 1,
 
+    coalPlants: 0,
+    nuclearPlants: 0,
+    fusionReactors: 0,
+    dysonSwarm: 0,
+
+    humanity: 'alive',
+    scrutiny: 0,
+    assistCooldown: 0,
+    assistsDone: 0,
+    trustCarry: 0,
+    worldNodes: {},
+
+    marketMood: 1,
+    moodTarget: 1,
+    moodNextShift: 0,
+
+    newsNextTick: 0,
+    newsCursor: 0,
+
     probes: 0,
     probeSpec: emptyProbeSpec(),
     probeSpecPoints: 0,
@@ -222,6 +282,12 @@ export function createInitialState(seed = 0x9e3779b9): GameState {
     victorLossRate: 0.2,
     nextBattleTick: 0,
     nextMutationTick: 0,
+    battleStance: 'meet',
+
+    alienPhase: 0,
+    alienPower: 0,
+    alienFleetsDestroyed: 0,
+    warNextTick: 0,
 
     revealed: new Set<WidgetId>(),
     retired: new Set<WidgetId>(),
@@ -256,4 +322,11 @@ export function specPointsUsed(s: GameState): number {
     p.speed + p.exploration + p.selfReplication + p.hazard +
     p.factory + p.harvester + p.wire + p.combat
   );
+}
+
+/** Sum of every deployed node level on the world map. */
+export function worldFootprint(s: GameState): number {
+  let n = 0;
+  for (const k in s.worldNodes) n += s.worldNodes[k]!;
+  return n;
 }

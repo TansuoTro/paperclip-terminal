@@ -48,6 +48,16 @@ function decode(raw:unknown):GameState {
     }
   }
   for(const k of ['ended','trustFrozen'] as const)if(typeof src[k]==='boolean')base[k]=src[k] as boolean;
+  // Enumerated strings + the world-map deployment table.
+  if(src['humanity']==='deceived'||src['humanity']==='destroyed')base.humanity=src['humanity'] as GameState['humanity'];
+  if(src['battleStance']==='ambush'||src['battleStance']==='fortify')base.battleStance=src['battleStance'] as GameState['battleStance'];
+  if([1,2,3].includes(src['alienPhase'] as number))base.alienPhase=src['alienPhase'] as GameState['alienPhase'];
+  const nodes=src['worldNodes'] as Record<string,unknown>|undefined;
+  if(nodes&&typeof nodes==='object'){
+    for(const [k,v]of Object.entries(nodes))if(typeof v==='number'&&Number.isInteger(v)&&v>=0&&v<=5)base.worldNodes[k]=v;
+  }
+  const alienPower=src['alienPower'];
+  if(typeof alienPower==='number'&&Number.isFinite(alienPower)&&alienPower>=0&&alienPower<=1e60)base.alienPower=alienPower;
   const settings=src['settings'] as Record<string,unknown>|undefined;
   if(settings&&typeof settings==='object'){
     base.settings=defaultSettings();
