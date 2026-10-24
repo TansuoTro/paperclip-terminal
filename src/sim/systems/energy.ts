@@ -11,8 +11,13 @@ export function dayNight(s: GameState): number {
   return s.dayNightFloor + (Math.sin(phase * Math.PI * 2) + 1) * 0.5 * (1 - s.dayNightFloor);
 }
 
+/** Solar output rides the day/night cycle; firm generation does not. */
 export function powerSupply(s: GameState): number {
-  return s.solarFarms * BAL.solarWatt * dayNight(s);
+  return s.solarFarms * BAL.solarWatt * dayNight(s) +
+    s.coalPlants * BAL.coalWatt +
+    s.nuclearPlants * BAL.nuclearWatt +
+    s.fusionReactors * BAL.fusionWatt +
+    s.dysonSwarm * BAL.dysonWatt;
 }
 
 export function energyCapacity(s: GameState): number {
@@ -31,4 +36,8 @@ export function energy(s: GameState, dt: number): void {
   if (!s.projectsDone.has('photovoltaic_array') || s.act === 3) return;
   const net = (powerSupply(s) - powerDemand(s)) * dt;
   s.energyStored = Math.max(0, Math.min(energyCapacity(s), s.energyStored + net));
+  // Fossil and nuclear generation attract regulators: burning watts through
+  // grid-scale plants leaks scrutiny even while the cover story is clean.
+  s.scrutiny = Math.min(1.2,
+    s.scrutiny + s.coalPlants * BAL.coalEmissions * dt + s.nuclearPlants * BAL.nuclearScrutiny * dt);
 }
